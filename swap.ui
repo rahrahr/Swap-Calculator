@@ -44,9 +44,9 @@
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_3">
            <item>
-            <widget class="QComboBox" name="list_type_2">
+            <widget class="QComboBox" name="list_type">
              <property name="sizePolicy">
-              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
@@ -54,9 +54,9 @@
             </widget>
            </item>
            <item>
-            <widget class="QComboBox" name="account_list_2">
+            <widget class="QComboBox" name="account_list">
              <property name="sizePolicy">
-              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
@@ -79,9 +79,9 @@
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_2">
            <item>
-            <widget class="QComboBox" name="list_type">
+            <widget class="QComboBox" name="list_type_2">
              <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
@@ -89,9 +89,9 @@
             </widget>
            </item>
            <item>
-            <widget class="QComboBox" name="account_list">
+            <widget class="QComboBox" name="account_list_2">
              <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
@@ -141,7 +141,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="notional"/>
+          <widget class="QLineEdit" name="nominal"/>
          </item>
          <item>
           <widget class="QPushButton" name="send_swap_order">
@@ -166,7 +166,11 @@
           </widget>
          </item>
          <item>
-          <widget class="QDateEdit" name="trade_date"/>
+          <widget class="QDateEdit" name="trade_date">
+           <property name="displayFormat">
+            <string>yyyy/MM/dd</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -180,7 +184,11 @@
           </widget>
          </item>
          <item>
-          <widget class="QDateEdit" name="dateEdit"/>
+          <widget class="QDateEdit" name="first_reset_date">
+           <property name="displayFormat">
+            <string>yyyy/MM/dd</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -344,7 +352,7 @@
            <item>
             <widget class="QLabel" name="label_14">
              <property name="text">
-              <string>利差</string>
+              <string>利差(bps)</string>
              </property>
             </widget>
            </item>
@@ -419,7 +427,11 @@
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_20">
        <item>
-        <widget class="QDateEdit" name="now_date"/>
+        <widget class="QDateEdit" name="now_date">
+         <property name="displayFormat">
+          <string>yyyy/MM/dd</string>
+         </property>
+        </widget>
        </item>
        <item>
         <widget class="QPushButton" name="pushButton">

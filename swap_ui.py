@@ -3,6 +3,8 @@ import re
 from PyQt5 import QtWidgets, uic
 import traceback
 import sys
+import swap_utils
+import swap_calculator
 sys.path.append("..")
 
 
@@ -49,7 +51,35 @@ class SwapUi(QtWidgets.QMainWindow):
         self.account_list.addItems(value)
 
     def calculate(self):
-        pass
+        name = self.floating_leg.currentText()
+        direction = self.trade_direction.currentText()
+        nominal = float(self.nominal.text())
+        trade_date = self.trade_date.text()
+        maturity = self.tenor.currentText()
+        first_reset_date = self.first_reset_date.text()
+        fixed_rate = float(self.fixed_leg.text()) / 100
+        payment_frequency = self.fixed_tenor.currentText()
+        fixed_daycount = self.fixed_accrual_method.currentText()
+        spread = int(self.bps.text())
+        reset_frequency = self.reset_tenor.currentText()
+        floating_daycount = self.floating_accrual_method.currentText()
+
+        swap = swap_utils.create_swap(name, direction,
+                                      nominal,
+                                      trade_date,
+                                      maturity,
+                                      first_reset_date,
+                                      fixed_rate,
+                                      payment_frequency,
+                                      fixed_daycount,
+                                      spread,
+                                      reset_frequency,
+                                      floating_daycount)
+
+        calc_date = self.now_date.text()
+        npv, dv01 = swap_calculator.calculate_vanilla(swap, name, calc_date)
+        self.reference_price.setText('{:.2f}'.format(npv))
+        self.dv01.setText('{:.2f}'.format(dv01))
 
     def sendSwapOrder(self):
         pass
