@@ -12,8 +12,8 @@ def calculate_vanilla(swap, name, calc_date):
     ql.Settings.instance().evaluationDate = calc_date
     calendar = ql.China(ql.China.IB)
     yts = ql.RelinkableYieldTermStructureHandle()
-    index = ql.IborIndex('MyIndex',
-                         ql.Period('3m'),
+    index = ql.IborIndex('LPR',
+                         ql.Period('3M'),
                          1,
                          ql.EURCurrency(),
                          ql.China(ql.China.IB),
@@ -25,15 +25,16 @@ def calculate_vanilla(swap, name, calc_date):
     for fixing_date in [cf.fixingDate() for cf in map(ql.as_floating_rate_coupon, swap.floatingLeg())]:
         if fixing_date > calc_date:
             break
-        date = calc_date.ISO().replace('-', '/')
-        index.addFixing(fixing_date, swap_utils.get_fixing_rate(name, date))
+        date = fixing_date.ISO().replace('-', '/')
+        index.addFixing(
+            fixing_date, swap_utils.get_fixing_rate(name, date))
 
     helpers = ql.RateHelperVector()
     for tenor in swap_rate:
         swap_index = ql.EuriborSwapIsdaFixA(ql.Period(tenor))
         rate = swap_rate[tenor]
         helpers.append(ql.SwapRateHelper(rate, swap_index))
-    curve = ql.PiecewiseLinearForward(
+    curve = ql.PiecewiseFlatForward(
         0, calendar, helpers, ql.Actual365Fixed())
     swap.yts.linkTo(curve)
 
@@ -46,7 +47,7 @@ def calculate_vanilla(swap, name, calc_date):
         swap_index = ql.EuriborSwapIsdaFixA(ql.Period(tenor))
         rate = swap_rate[tenor] + shift
         helpers.append(ql.SwapRateHelper(rate, swap_index))
-    up_curve = ql.PiecewiseLinearForward(
+    up_curve = ql.PiecewiseFlatForward(
         0, calendar, helpers, ql.Actual365Fixed())
     swap.yts.linkTo(up_curve)
     up_swap_npv = swap.NPV()
@@ -56,7 +57,7 @@ def calculate_vanilla(swap, name, calc_date):
         swap_index = ql.EuriborSwapIsdaFixA(ql.Period(tenor))
         rate = swap_rate[tenor] - shift
         helpers.append(ql.SwapRateHelper(rate, swap_index))
-    down_curve = ql.PiecewiseLinearForward(
+    down_curve = ql.PiecewiseFlatForward(
         0, calendar, helpers, ql.Actual365Fixed())
     swap.yts.linkTo(down_curve)
     down_swap_npv = swap.NPV()

@@ -63,8 +63,8 @@ def create_swap(name: str,
 
     # build yield curve
     yts = ql.RelinkableYieldTermStructureHandle()
-    index = ql.IborIndex('MyIndex',
-                         ql.Period('3m'),
+    index = ql.IborIndex('LPR',
+                         ql.Period('3M'),
                          1,
                          ql.EURCurrency(),
                          ql.China(ql.China.IB),
@@ -79,7 +79,7 @@ def create_swap(name: str,
         swap_index = ql.EuriborSwapIsdaFixA(ql.Period(tenor))
         rate = swap_rate[tenor]
         helpers.append(ql.SwapRateHelper(rate, swap_index))
-    curve = ql.PiecewiseLinearForward(0, calendar, helpers, fixed_daycount)
+    curve = ql.PiecewiseFlatForward(0, calendar, helpers, fixed_daycount)
     yts.linkTo(curve)
     engine = ql.DiscountingSwapEngine(yts)
 
