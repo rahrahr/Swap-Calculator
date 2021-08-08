@@ -7,7 +7,7 @@ _xlsx_path = json.load(
     open('settings.json'), encoding='utf-8')["Data Getter Path"]
 book = xw.Book(_xlsx_path)
 term_structure = book.sheets['期限结构']
-
+curve_building_method = ql.PiecewiseFlatForward
 
 def create_swap(name: str,
                 direction: str,
@@ -22,7 +22,11 @@ def create_swap(name: str,
                 reset_frequency: str,
                 floating_daycount: str):
 
-    if payment_frequency != reset_frequency:
+    if payment_frequency < reset_frequency:
+        raise Exception(
+            'payment_frequency < reset_frequency not yet supported')
+
+    if payment_frequency > reset_frequency:
         return create_compounding_swap(direction,
                                        nominal,
                                        trade_date,
@@ -49,22 +53,10 @@ def create_swap(name: str,
     accrural_start_date = calendar.advance(first_reset_date, ql.Period('1D'))
     termination_date = calendar.advance(accrural_start_date, maturity)
 
-    # fixed_schedule = ql.MakeSchedule(first_reset_date,
-    #                                  termination_date,
-    #                                  frequency=payment_frequency,
-    #                                  calendar=calendar,
-    #                                  convention=ql.ModifiedFollowing)
-
-    # floating_schedule = ql.MakeSchedule(first_reset_date,
-    #                                     termination_date,
-    #                                     frequency=payment_frequency,
-    #                                     calendar=calendar,
-    #                                     convention=ql.ModifiedFollowing)
-
     # build yield curve
     yts = ql.RelinkableYieldTermStructureHandle()
     index = ql.IborIndex('LPR',
-                         ql.Period('3M'),
+                         reset_frequency,
                          1,
                          ql.EURCurrency(),
                          ql.China(ql.China.IB),
@@ -79,7 +71,7 @@ def create_swap(name: str,
         swap_index = ql.EuriborSwapIsdaFixA(ql.Period(tenor))
         rate = swap_rate[tenor]
         helpers.append(ql.SwapRateHelper(rate, swap_index))
-    curve = ql.PiecewiseFlatForward(0, calendar, helpers, fixed_daycount)
+    curve = curve_building_method(0, calendar, helpers, fixed_daycount)
     yts.linkTo(curve)
     engine = ql.DiscountingSwapEngine(yts)
 
@@ -108,10 +100,12 @@ def create_swap(name: str,
     swap.yts = yts
     engine = ql.DiscountingSwapEngine(swap.yts)
     swap.setPricingEngine(engine)
+    swap.reset_frequency = reset_frequency
     return swap
 
 
-def create_compounding_swap(direction: str,
+def create_compounding_swap(name: str,
+                            direction: str,
                             nominal: float,
                             trade_date: str,
                             maturity: str,
@@ -122,7 +116,83 @@ def create_compounding_swap(direction: str,
                             spread: int,
                             reset_frequency: str,
                             floating_daycount: str):
-    pass
+    # reset_frequency > payment_frequency
+    fixed_leg = create_swap(name,
+                            direction,
+                            nominal,
+                            trade_date,
+                            maturity,
+                            first_reset_date,
+                            fixed_rate,
+                            payment_frequency,
+                            fixed_daycount,
+                            spread,
+                            payment_frequency,
+                            floating_daycount).fixedLeg()
+
+    direction = ql.VanillaSwap.Payer if direction == '支付固定' else ql.VanillaSwap.Receiver
+    trade_date = ql.Date(trade_date, '%Y/%m/%d')
+    maturity = ql.Period(maturity)
+    first_reset_date = ql.Date(first_reset_date, '%Y/%m/%d')
+    payment_frequency = convert_frequency(payment_frequency)
+    fixed_daycount = convert_daycount(fixed_daycount)
+    spread = spread * 0.0001
+    reset_frequency = convert_frequency(reset_frequency)
+    floating_daycount = convert_daycount(floating_daycount)
+
+    calendar = ql.China(ql.China.IB)
+    accrural_start_date = calendar.advance(first_reset_date, ql.Period('1D'))
+    termination_date = calendar.advance(accrural_start_date, maturity)
+    last_reset_date = calendar.advance(first_reset_date, maturity)
+
+    floating_schedule = ql.MakeSchedule(accrural_start_date,
+                                        termination_date,
+                                        payment_frequency,
+                                        calendar=calendar,
+                                        convention=ql.ModifiedFollowing)
+
+    fixing_schedule = ql.MakeSchedule(first_reset_date,
+                                      last_reset_date,
+                                      reset_frequency,
+                                      calendar=calendar,
+                                      convention=ql.ModifiedFollowing)
+
+    yts = ql.RelinkableYieldTermStructureHandle()
+    index = ql.IborIndex('LPR',
+                         reset_frequency,
+                         1,
+                         ql.EURCurrency(),
+                         ql.China(ql.China.IB),
+                         ql.ModifiedFollowing,
+                         True,
+                         ql.Actual365Fixed(),
+                         yts)
+
+    helpers = ql.RateHelperVector()
+    swap_rate = get_swap_curve(name, first_reset_date.ISO().replace('-', '/'))
+    for tenor in swap_rate:
+        swap_index = ql.EuriborSwapIsdaFixA(ql.Period(tenor))
+        rate = swap_rate[tenor]
+        helpers.append(ql.SwapRateHelper(rate, swap_index))
+    curve = curve_building_method(0, calendar, helpers, fixed_daycount)
+    yts.linkTo(curve)
+    engine = ql.DiscountingSwapEngine(yts)
+
+    floating_leg = ql.SubPeriodsLeg(nominals=[nominal],
+                                    schedule=floating_schedule,
+                                    index=index,
+                                    paymentCalendar=ql.China(),
+                                    paymentLag=0,
+                                    paymentDayCounter=floating_daycount,
+                                    rateSpreads=[spread],
+                                    averagingMethod=ql.RateAveraging.Compound)
+
+    swap = ql.Swap(fixed_leg, floating_leg)
+    swap.yts = yts
+    engine = ql.DiscountingSwapEngine(swap.yts)
+    swap.setPricingEngine(engine)
+    swap.reset_frequency = reset_frequency
+    return swap
 
 
 def convert_frequency(freq: str):
@@ -145,11 +215,21 @@ def get_swap_curve(name: str, date: str):
     book.app.calculation = 'manual'
     term_structure.range('A2').value = name
     term_structure.range('B2').value = date
+
+    curve_sheet = book.sheets[name+'_swap']
+    curve = curve_sheet.range('A1').expand().options(pd.DataFrame).value
+    curve = curve.loc[:date].iloc[-1].to_frame().T / 100
+    curve.columns = [x.split(':')[-1] for x in curve.columns]
+    curve.index = [get_fixing_rate(name, date)]
+    curve.index.name = '3M'
+
+    term_structure.range('C1').expand().value = curve
+
     book.app.calculate()
     book.app.calculation = 'automatic'
 
-    curve = term_structure.range('A1').expand().options(pd.DataFrame).value
-    return curve.loc[:, '6M':'10Y'].T.iloc[:, 0].to_dict()
+    curve = term_structure.range('B1').expand().options(pd.DataFrame).value
+    return curve.T.iloc[:, 0].astype(float).to_dict()
 
 
 def get_discount_curve(name: str, date: str):
@@ -161,6 +241,11 @@ def get_fixing_rate(name: str, date: str):
     book.app.calculation = 'manual'
     fixing_rate_sheet.range('A2').value = name
     fixing_rate_sheet.range('B2').value = date
+
+    rate_sheet = book.sheets[name]
+    rates = rate_sheet.range('A1').expand().options(pd.DataFrame).value
+    fixing_rate_sheet.range('C2').value = rates.loc[:date].iloc[-1].iloc[0] / 100
+
     book.app.calculate()
     book.app.calculation = 'automatic'
 
