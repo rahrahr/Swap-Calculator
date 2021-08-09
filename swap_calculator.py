@@ -14,7 +14,7 @@ def calculate_vanilla(swap, name, calc_date):
     calendar = ql.China(ql.China.IB)
     yts = ql.RelinkableYieldTermStructureHandle()
     index = ql.IborIndex('LPR',
-                         swap.reset_frequency,
+                         min(swap.payment_frequency, swap.reset_frequency),
                          1,
                          ql.EURCurrency(),
                          ql.China(ql.China.IB),
@@ -22,18 +22,19 @@ def calculate_vanilla(swap, name, calc_date):
                          True,
                          ql.Actual365Fixed(),
                          yts)
-    if type(swap) == ql.QuantLib.VanillaSwap:
-        for fixing_date in [cf.fixingDate() for cf in map(ql.as_floating_rate_coupon, swap.leg(1))]:
+
+    if swap.is_compounded:
+        all_dates = []
+        for cf in map(ql.as_sub_periods_coupon, swap.leg(1)):
+                all_dates.extend(cf.fixingDates())
+        for fixing_date in all_dates:
             if fixing_date > calc_date:
                 break
             date = fixing_date.ISO().replace('-', '/')
             index.addFixing(
                 fixing_date, swap_utils.get_fixing_rate(name, date))
     else:
-        all_dates = []
-        for cf in map(ql.as_sub_periods_coupon, swap.leg(1)):
-            all_dates.extend(cf.fixingDates())
-        for fixing_date in all_dates:
+        for fixing_date in [cf.fixingDate() for cf in map(ql.as_floating_rate_coupon, swap.leg(1))]:
             if fixing_date > calc_date:
                 break
             date = fixing_date.ISO().replace('-', '/')
@@ -73,7 +74,7 @@ def calculate_vanilla(swap, name, calc_date):
     swap.yts.linkTo(down_curve)
     down_swap_npv=swap.NPV()
 
-    dv01=(up_swap_npv - down_swap_npv) / 10
+    dv01 = (up_swap_npv - down_swap_npv) / 10
     swap.yts.linkTo(curve)
     return npv, dv01
 

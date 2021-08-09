@@ -2,10 +2,10 @@ import json
 import re
 from PyQt5 import QtWidgets, uic
 import traceback
-import sys
 import swap_utils
 import swap_calculator
-sys.path.append("..")
+import QuantLib as ql
+import pandas as pd
 
 
 class SwapUi(QtWidgets.QMainWindow):
@@ -80,8 +80,13 @@ class SwapUi(QtWidgets.QMainWindow):
             calc_date = self.now_date.text()
             npv, dv01 = swap_calculator.calculate_vanilla(
                 swap, name, calc_date)
+            if direction == '收取固定' and type(swap) != ql.QuantLib.VanillaSwap:
+                npv, dv01 = -npv, -dv01
             self.reference_price.setText('{:.2f}'.format(npv))
             self.dv01.setText('{:.2f}'.format(dv01))
+
+            print(pd.DataFrame([(c.date(), c.amount(), c.rate(), c.fixingDate())
+                                for c in map(ql.as_floating_rate_coupon, swap.leg(1))]))
 
         except:
             QtWidgets.QMessageBox().about(self, '错误信息', traceback.format_exc())
